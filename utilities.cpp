@@ -21,4 +21,3 @@ void printPathWithWeights(childType child, nodeType finalNode, ResidualGraph *r)
     }
     std::cout << output;
 }
-

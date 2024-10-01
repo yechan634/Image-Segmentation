@@ -8,34 +8,45 @@
 #include <queue>
 #include <set>
 #include <vector>
+#include <array>
 
 #define MAX_RESIDUAL_CAPACITY 999
 
 typedef int nodeType;
 typedef double weightType;
-struct adjListMember
+struct childInfo
 {
     nodeType node;
     weightType weight;
     bool isForward;
 };
-typedef std::map<nodeType, std::vector<struct adjListMember> *> nodesMapType;
+// first entry is reverse edge while second is forward
+struct matrixElem
+{
+    weightType weight;
+    bool exists;
+};
 
-typedef std::map<nodeType, struct adjListMember> childType;
+typedef std::vector<std::vector<std::array<matrixElem, 2>>> matrixType;
+
+typedef std::map<nodeType, struct childInfo> childType;
 // first is node, second is weight
 
 class ResidualGraph;
 
-// starts empty - directed - uses adjacency List
+// starts empty - directed - uses adjacency matrix
+// assume node numbering starts from 0
 class Graph
 {
 private:
     friend class ResidualGraph;
     // automaticlaly creates empty map
 protected:
-    nodesMapType nodesMap;
+    matrixType matrix;
 
 public:
+    Graph(int initialNumNodes = 0);
+    ~Graph(); // same dereference can be used for ResidualGraph
     bool addNewConnection(nodeType u, nodeType v, weightType weight, bool isForward = true);
     bool connectionExists(nodeType u, nodeType v, bool isForward = true);
     bool nodeExists(nodeType u);
@@ -44,7 +55,6 @@ public:
     std::set<nodeType> allReachable(nodeType start);
     ResidualGraph *createResidualGraph(); // FIX THIS
     void print();
-    ~Graph(); // same dereference can be used for ResidualGraph
 };
 
 // ResidualGraph class declaration

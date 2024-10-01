@@ -15,25 +15,20 @@ void printNodeSet(std::set<T> nodes)
     std::cout << "\n";
 }
 
-/*
-
-parentType createPath(const std::vector<nodeType> nodes);
-
-bool samePath(parentType parent1, parentType parent2);
-
-
-
-*/
-template<typename T>
-bool sameSet(const std::set<T>& set1, const std::set<T>& set2) {
+template <typename T>
+bool sameSet(const std::set<T> &set1, const std::set<T> &set2)
+{
     // Check if the sizes are different
-    if (set1.size() != set2.size()) {
+    if (set1.size() != set2.size())
+    {
         return false;
     }
 
     // Check if all elements in set1 are in set2
-    for (const auto& element : set1) {
-        if (set2.find(element) == set2.end()) {
+    for (const auto &element : set1)
+    {
+        if (set2.find(element) == set2.end())
+        {
             return false; // Element not found in set2
         }
     }

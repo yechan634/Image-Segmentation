@@ -2,7 +2,7 @@
 #include "utilities.h"
 
 // running this testsuite
-// g++ -g -o test main.cpp testResidualGraph.cpp -lgtest -lgtest_main -pthread && ./test
+// g++ -g -o test testResidualGraph.cpp graph.cpp -lgtest -lgtest_main -pthread && ./test
 // to run only a few of the tests, use filter:
 // ./test --gtest_filter=TestSuiteName.TestName
 // with valgirnd:
@@ -34,6 +34,55 @@ TEST(GraphTest, NodeExists)
     assert(g->nodeExists(1));
     assert(g->nodeExists(2));
     delete g;
+}
+
+TEST(ResidualGraph, PushFlow)
+{
+    Graph *g = new Graph();
+    g->addNewConnection(1, 2, 2);
+    auto r = g->createResidualGraph();
+    childType path;
+    path[2] = {1, 2, true};
+    r->pushFlow(path, 2, 2);
+    assert(r->getWeight(1, 2, true) == 0);
+    assert(r->getWeight(2, 1, false) == 2);
+    delete g;
+    delete r;
+}
+
+TEST(ResidualGraph, PushFlowWithCycle)
+{
+    Graph *g = new Graph();
+    g->addNewConnection(1, 2, 3);
+    g->addNewConnection(2, 1, 3);
+    g->addNewConnection(2, 3, 1);
+    auto r = g->createResidualGraph();
+    childType path;
+    path[3] = {2, 1, true};
+    path[2] = {1, 3, true};
+    r->pushFlow(path, 3, 1);
+    assert(r->getWeight(1, 2, true) == 2);
+    assert(r->getWeight(2, 1, false) == 1);
+    assert(r->getWeight(2, 1, true) == 3);
+    assert(r->getWeight(1, 2, false) == 0);
+    assert(r->getWeight(2, 3, true) == 0);
+    assert(r->getWeight(3, 2, false) == 1);
+    delete g;
+    delete r;
+}
+
+TEST(ResidualGraph, allReachable)
+{
+    Graph *g = new Graph();
+    g->addNewConnection(1, 2, 3);
+    g->addNewConnection(2, 3, 3);
+    g->addNewConnection(4, 1, 1);
+    auto r = g->createResidualGraph();
+    auto actualSet = r->allReachable(1);
+    auto expectedSet = std::set<nodeType>{1, 2, 3};
+    assert(sameSet(actualSet, expectedSet));
+    delete g;
+    delete r;
 }
 
 TEST(ResidualGraph, MinCut)
@@ -111,39 +160,6 @@ TEST(ResidualGraph, MinCut_Complex)
     assert(sameSet(actualSet, expectedSet));
     delete g;
     delete r;
-}
-
-TEST(ResidualGraph, PushFlow)
-{
-    Graph *g = new Graph();
-    g->addNewConnection(1, 2, 2);
-    auto r = g->createResidualGraph();
-    childType path;
-    path[2] = {1, 2, true};
-    r->pushFlow(path, 2, 2);
-    assert(r->getWeight(1, 2, true) == 0);
-    assert(r->getWeight(2, 1, false) == 2);
-}
-
-TEST(ResidualGraph, PushFlowWithCycle)
-{
-    Graph *g = new Graph();
-    g->addNewConnection(1, 2, 3);
-    g->addNewConnection(2, 1, 3);
-    g->addNewConnection(2, 3, 1);
-    auto r = g->createResidualGraph();
-    childType path;
-    path[3] = {2, 1, true};
-    path[2] = {1, 3, true};
-    r->print();
-    r->pushFlow(path, 3, 1);
-    r->print();
-    assert(r->getWeight(1, 2, true) == 2);
-    assert(r->getWeight(2, 1, false) == 1);
-    assert(r->getWeight(2, 1, true) == 3);
-    assert(r->getWeight(1, 2, false) == 0);
-    assert(r->getWeight(2, 3, true) == 0);
-    assert(r->getWeight(3, 2, false) == 1);
 }
 
 int main(int argc, char **argv)

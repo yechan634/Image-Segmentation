@@ -92,7 +92,7 @@ cv::Mat getExtractedObject(const std::string &imgPath)
     {
         throw std::invalid_argument("Couldn't open or find image\n");
     }
-    auto imgGraph = new Graph();
+    auto imgGraph = new Graph(img.rows * img.cols);
     nodeType source = 1;
     nodeType sink = 2;
     nodeType n = sink + 1;
@@ -148,4 +148,3 @@ cv::Mat getExtractedObject(const std::string &imgPath)
 
     return output;
 }
-
