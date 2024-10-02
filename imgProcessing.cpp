@@ -93,6 +93,7 @@ cv::Mat getExtractedObject(const std::string &imgPath)
         throw std::invalid_argument("Couldn't open or find image\n");
     }
     auto imgGraph = new Graph(img.rows * img.cols);
+    //auto r = imgGraph -> createResidualGraph();
     nodeType source = 1;
     nodeType sink = 2;
     nodeType n = sink + 1;
@@ -108,28 +109,32 @@ cv::Mat getExtractedObject(const std::string &imgPath)
             {
                 auto rightPixel = img.at<cv::Vec3b>(y, x + 1);
                 imgGraph->addNewConnection(n, n + 1, calcWeightBetweenTwoPixels(currentPixel, rightPixel));
+                //r->addNewConnection(n, n + 1, calcWeightBetweenTwoPixels(currentPixel, rightPixel), false);
             }
             if (x > 0)
             {
                 auto leftPixel = img.at<cv::Vec3b>(y, x - 1);
                 imgGraph->addNewConnection(n, n - 1, calcWeightBetweenTwoPixels(currentPixel, leftPixel));
+                //r->addNewConnection(n, n - 1, calcWeightBetweenTwoPixels(currentPixel, leftPixel), false);
             }
             if (y < img.rows - 1)
             {
                 auto belowPixel = img.at<cv::Vec3b>(y + 1, x);
                 imgGraph->addNewConnection(n, n + img.cols, calcWeightBetweenTwoPixels(currentPixel, belowPixel));
+                //r->addNewConnection(n, n + img.cols, calcWeightBetweenTwoPixels(currentPixel, belowPixel), false);
             }
             if (y > 0)
             {
                 auto abovePixel = img.at<cv::Vec3b>(y - 1, x);
                 imgGraph->addNewConnection(n, n - img.cols, calcWeightBetweenTwoPixels(currentPixel, abovePixel));
+                //r->addNewConnection(n, n - img.cols, calcWeightBetweenTwoPixels(currentPixel, abovePixel), false);
             }
             imgGraph->addNewConnection(source, n, getSourceWeightToPixel(y, x, saliencyMap));
             imgGraph->addNewConnection(n, sink, getSinkWeightToPixel(y, x, saliencyMap));
             ++n;
         }
     }
-    std::cout << "finished making graph\n";
+    printf("finished making graph\n");
     auto r = imgGraph->createResidualGraph();
     auto nodesToKeep = r->getMinCut(source, sink);
     // source, sink nodes don't have corresponding pixels in image

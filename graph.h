@@ -20,14 +20,15 @@ struct childInfo
     weightType weight;
     bool isForward;
 };
-// first entry is reverse edge while second is forward
+
 struct matrixElem
 {
+    nodeType toNode;
     weightType weight;
-    bool exists;
+    bool isForward;
 };
 
-typedef std::vector<std::vector<std::array<matrixElem, 2>>> matrixType;
+typedef std::vector<std::vector<struct matrixElem>> matrixType;
 
 typedef std::map<nodeType, struct childInfo> childType;
 // first is node, second is weight
@@ -40,7 +41,7 @@ class Graph
 {
 private:
     friend class ResidualGraph;
-    // automaticlaly creates empty map
+    struct matrixElem *getMatrixElem(nodeType u, nodeType v, bool isForward = true);
 protected:
     matrixType matrix;
 
@@ -61,7 +62,7 @@ public:
 class ResidualGraph : public Graph
 {
 private:
-    ResidualGraph();
+    ResidualGraph(matrixType originalMatrix = matrixType());
     friend Graph;
 
 public:

@@ -9,9 +9,7 @@ const double EPSILON = 1e-9;
 
 Graph::Graph(int initialNodesNum)
 {
-    std::vector<std::array<matrixElem, 2>>
-        row(initialNodesNum, std::array<matrixElem, 2>{{{0.0, false}, {0.0, false}}});
-    matrixType _matrix(initialNodesNum, row);
+    std::vector<std::vector<struct matrixElem>> _matrix(initialNodesNum);
     matrix = _matrix;
 }
 
@@ -24,6 +22,16 @@ bool Graph::nodeExists(nodeType u)
     return (u < matrix.size());
 }
 
+struct matrixElem *Graph::getMatrixElem(nodeType u, nodeType v, bool isForward) { // can use this in place of connectionExists
+    auto it = std::find_if(matrix[u].begin(), matrix[u].end(), [v, isForward](struct matrixElem edge) {
+        return (edge.toNode == v && edge.isForward == isForward);
+    });
+    if (it == matrix[u].end()) {
+        return nullptr;
+    }
+    return &(*it);
+}
+
 // isForward is true by default
 bool Graph::connectionExists(nodeType u, nodeType v, bool isForward)
 {
@@ -31,16 +39,16 @@ bool Graph::connectionExists(nodeType u, nodeType v, bool isForward)
     {
         return false;
     }
-    return matrix.at(u).at(v)[isForward].exists;
+    return getMatrixElem(u, v, isForward) != nullptr;
 }
 
 weightType Graph::getWeight(nodeType u, nodeType v, bool isForward)
 {
-    if (!connectionExists(u, v, isForward))
+    if (!connectionExists(u, v, isForward)) // can use getMatrixElem here for micro improvement
     {
         throw std::invalid_argument("no such edge exists");
     }
-    return matrix.at(u).at(v)[isForward].weight;
+    return getMatrixElem(u, v, isForward)->weight;
 }
 
 bool Graph::addNewConnection(nodeType u, nodeType v, weightType weight, bool isForward)
@@ -51,25 +59,24 @@ bool Graph::addNewConnection(nodeType u, nodeType v, weightType weight, bool isF
         return false;
     }
     nodeType largerNode = std::max(u, v);
-
+    // assume u >= 0 so not checked as well
     if (!nodeExists(largerNode))
     {
-        for (auto &row : matrix)
-        {
-            row.resize(largerNode + 1, std::array<matrixElem, 2>{{{0.0, false}, {0.0, false}}});
-        }
         // Ensure the graph has enough space for the new node
         while (matrix.size() <= largerNode)
         {
             // Add a new row for the new node
-            std::vector<std::array<matrixElem, 2>> newRow(largerNode + 1, std::array<matrixElem, 2>{{{0.0, false}, {0.0, false}}});
+            std::vector<struct matrixElem> newRow(largerNode + 1);
             matrix.push_back(newRow);
         }
     }
-
-    matrix[u][v][isForward].weight = weight;
-    matrix[u][v][isForward].exists = true;
-
+    matrix[u].push_back(
+        {
+            v,
+            weight,
+            isForward
+        }
+    );
     return true; // Successfully added the connection
 }
 
@@ -79,7 +86,7 @@ bool Graph::addEdgeWeightBy(nodeType u, nodeType v, weightType newWeight, bool i
     {
         return false;
     }
-    matrix[u][v][isForward].weight += newWeight;
+    getMatrixElem(u, v, isForward)->weight += newWeight;
     return true;
 }
 
@@ -154,7 +161,9 @@ Graph::~Graph()
 {
 }
 
-ResidualGraph::ResidualGraph() {};
+ResidualGraph::ResidualGraph(matrixType originalMatrix) {
+    matrix = originalMatrix;
+};
 
 void ResidualGraph::pushFlow(childType augmentedPath, nodeType finalNode, weightType minResidualCapacity)
 {
@@ -182,7 +191,7 @@ std::set<nodeType> ResidualGraph::getMinCut(nodeType s, nodeType t)
     while (true)
     {
         childType child = getPath(s, t);
-        // printPathWithWeights(child, t, this);
+        printPathWithWeights(child, t, this);
 
         if (child.empty())
         {
@@ -203,68 +212,119 @@ std::set<nodeType> ResidualGraph::getMinCut(nodeType s, nodeType t)
     }
 }
 
+
+
 // returns empty set if no path is found
+// childType ResidualGraph::getPath(nodeType start, nodeType end)
+// {
+//     std::queue<nodeType> q;
+//     childType child;
+//     std::set<nodeType> visited;
+//     if (!nodeExists(start) || !nodeExists(end))
+//     {
+//         return child;
+//     }
+//     q.push(start);
+//     while (!q.empty())
+//     {
+//         nodeType current = q.front();
+//         if (current == end)
+//         {
+//             return child;
+//         }
+//         q.pop();
+//         visited.insert(current);
+//         /*
+//         for (int otherNode = 0; otherNode < matrix.size(); otherNode++)
+//         {
+//             if (
+//                 connectionExists(current, otherNode, true) &&
+//                 visited.find(otherNode) == visited.end() &&
+//                 getWeight(current, otherNode, true) > EPSILON)
+//             {
+//                 child[otherNode] = {current, getWeight(current, otherNode, true), true};
+//                 q.push(otherNode);
+//             }
+
+//             if (
+//                 connectionExists(current, otherNode, false) &&
+//                 visited.find(otherNode) == visited.end() &&
+//                 getWeight(current, otherNode, false) > EPSILON)
+//             {
+//                 child[otherNode] = {current, getWeight(current, otherNode, false), false};
+//                 q.push(otherNode);
+//             }
+//         }
+//         */
+//         // each forward edge has corresponding reverse edge
+        
+//         for (auto edge : matrix[current])
+//         {
+//             if (visited.find(edge.toNode) == visited.end() && std::abs(edge.weight) > EPSILON)
+//             {
+//                 child[edge.toNode] = {current, edge.weight, edge.isForward};
+//                 q.push(edge.toNode);
+//             }
+//         }
+//     }
+
+//     child.clear();
+//     return child;
+// }
+
 childType ResidualGraph::getPath(nodeType start, nodeType end)
 {
-    std::queue<nodeType> q;
+    std::stack<nodeType> s;
     childType child;
     std::set<nodeType> visited;
+
     if (!nodeExists(start) || !nodeExists(end))
     {
-        return child;
+        return child; // Return empty if start or end is invalid
     }
-    q.push(start);
-    while (!q.empty())
+
+    s.push(start);
+
+    while (!s.empty())
     {
-        nodeType current = q.front();
+        //printf("%ld\n", child.size());
+        nodeType current = s.top();
+        s.pop();
+
+        // If we reach the end node, return the path found
         if (current == end)
         {
             return child;
         }
-        q.pop();
-        visited.insert(current);
 
-        for (int otherNode = 0; otherNode < matrix.size(); otherNode++)
+        if (visited.find(current) == visited.end()) // Check if current node is not visited
         {
-            if (
-                connectionExists(current, otherNode, true) &&
-                visited.find(otherNode) == visited.end() &&
-                getWeight(current, otherNode, true) > EPSILON)
-            {
-                child[otherNode] = {current, getWeight(current, otherNode, true), true};
-                q.push(otherNode);
-            }
+            visited.insert(current);
 
-            if (
-                connectionExists(current, otherNode, false) &&
-                visited.find(otherNode) == visited.end() &&
-                getWeight(current, otherNode, false) > EPSILON)
+            // Iterate over all edges from the current node
+            for (auto edge : matrix[current])
             {
-                child[otherNode] = {current, getWeight(current, otherNode, false), false};
-                q.push(otherNode);
+                if (visited.find(edge.toNode) == visited.end() && std::abs(edge.weight) > EPSILON)
+                {
+                    // Store the path
+                    child[edge.toNode] = {current, edge.weight, edge.isForward};
+                    s.push(edge.toNode); // Push the next node onto the stack
+                }
             }
         }
-        // each forward edge has corresponding reverse edge
-        /*
-        for (auto neighbour : *nodesMap[current])
-        {
-            if (visited.find(neighbour.node) == visited.end() && std::abs(neighbour.weight) > EPSILON)
-            {
-                child[neighbour.node] = {current, neighbour.weight, neighbour.isForward};
-                q.push(neighbour.node);
-            }
-        }
-        */
     }
-    child.clear();
+
+    child.clear(); // Return empty child if no path is found
     return child;
 }
 
+
 ResidualGraph *Graph::createResidualGraph()
 {
-    auto r = new ResidualGraph(); // throws error if memory allocatino fails
-    for (int nodeFrom = 0; nodeFrom < matrix.size(); nodeFrom++)
+    auto r = new ResidualGraph(matrix); // throws error if memory allocatino fails
+    for (int fromNode = 0; fromNode < matrix.size(); fromNode++)
     {
+        /*
         for (int nodeTo = 0; nodeTo < matrix.size(); nodeTo++)
         {
             if (connectionExists(nodeFrom, nodeTo))
@@ -273,6 +333,12 @@ ResidualGraph *Graph::createResidualGraph()
                 // adding corresponding reverse edge
                 r->addNewConnection(nodeTo, nodeFrom, 0, false);
             }
+        }
+        */
+        for (auto edge : matrix[fromNode]) {
+            auto toNode = edge.toNode;
+                // adding corresponding reverse edge
+            r->addNewConnection(toNode, fromNode, 0, false);
         }
     }
     return r;
