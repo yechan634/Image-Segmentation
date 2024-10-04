@@ -6,4 +6,3 @@
 // coloured images
 cv::Mat getExtractedObject(const std::string &imgPath);
 #endif
-

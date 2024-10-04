@@ -68,17 +68,20 @@ cv::Mat computeSaliency(cv::Mat img)
     return (1 - saliencyMap);
 }
 
-
-void printProbabilityMap(cv::Mat probabilityMap) {
-    for (int row = 0 ; row < probabilityMap.rows ; ++row) {
-        for (int col = 0 ; col < probabilityMap.cols ; ++col) {
+void printProbabilityMap(cv::Mat probabilityMap)
+{
+    for (int row = 0; row < probabilityMap.rows; ++row)
+    {
+        for (int col = 0; col < probabilityMap.cols; ++col)
+        {
             printf("%f ", probabilityMap.at<double>(row, col));
         }
         printf("\n");
     }
 }
 
-void showProbabilityMap(cv::Mat probabilityMap) {
+void showProbabilityMap(cv::Mat probabilityMap)
+{
     cv::namedWindow("Grayscale probabilities", cv::WINDOW_NORMAL);
     cv::resizeWindow("Grayscale probabilities", 800, 800);
     cv::Mat grayscale;
@@ -87,8 +90,8 @@ void showProbabilityMap(cv::Mat probabilityMap) {
     cv::waitKey(0);
 }
 
-
-cv::Mat computeGMMmap(const cv::Mat& image, int numComponents = 5) {
+cv::Mat computeGMMmap(const cv::Mat &image, int numComponents = 5)
+{
     // reshaping the image into a 2D matrix with each row as a pixel (in 3D color space)
     cv::Mat samples = image.reshape(1, image.rows * image.cols);
     samples.convertTo(samples, CV_64F); // Convert to double type for GMM
@@ -98,7 +101,8 @@ cv::Mat computeGMMmap(const cv::Mat& image, int numComponents = 5) {
     gmm->setCovarianceMatrixType(cv::ml::EM::COV_MAT_DIAGONAL);
     gmm->setTermCriteria(cv::TermCriteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 100, 0.1));
 
-    if (gmm->trainEM(samples) < 0) {
+    if (gmm->trainEM(samples) < 0)
+    {
         std::cerr << "GMM training failed." << std::endl;
         return cv::Mat(); // Return an empty matrix if training fails
     }
@@ -106,13 +110,16 @@ cv::Mat computeGMMmap(const cv::Mat& image, int numComponents = 5) {
     cv::Mat weights = gmm->getWeights();
     cv::Mat probabilityMap(image.rows, image.cols, CV_64F, cv::Scalar(0)); // Initialize to zero
 
-    for (int row = 0; row < image.rows; ++row) {
-        for (int col = 0; col < image.cols; ++col) {
+    for (int row = 0; row < image.rows; ++row)
+    {
+        for (int col = 0; col < image.cols; ++col)
+        {
             cv::Vec3d pixel = samples.at<cv::Vec3d>(row * image.cols + col);
             cv::Mat posterior;
             gmm->predict2(pixel, posterior);
             double foregroundProbability = 0.0;
-            for (int i = 0; i < numComponents; ++i) {
+            for (int i = 0; i < numComponents; ++i)
+            {
                 foregroundProbability += posterior.at<double>(i) * weights.at<double>(i);
             }
             probabilityMap.at<double>(row, col) = foregroundProbability;
@@ -122,14 +129,14 @@ cv::Mat computeGMMmap(const cv::Mat& image, int numComponents = 5) {
     return (1 - probabilityMap);
 }
 
-
-cv::Mat saliencyWithRegionGrowing(cv::Mat inputImage) {
+cv::Mat saliencyWithRegionGrowing(cv::Mat inputImage)
+{
     cv::Ptr<cv::saliency::StaticSaliencyFineGrained> saliencyAlgorithm = cv::saliency::StaticSaliencyFineGrained::create();
     cv::Mat saliencyMap;
     saliencyAlgorithm->computeSaliency(inputImage, saliencyMap);
-    
+
     cv::normalize(saliencyMap, saliencyMap, 0, 1, cv::NORM_MINMAX);
-    
+
     // thresholding saliency map to get foreground estimation
     cv::Mat initialForeground;
     cv::threshold(saliencyMap, initialForeground, SALIENCY_THRESHOLD, 1.0, cv::THRESH_BINARY);
@@ -141,19 +148,19 @@ cv::Mat saliencyWithRegionGrowing(cv::Mat inputImage) {
     cv::normalize(distForeground, distForeground, 0, 1.0, cv::NORM_MINMAX);
 
     // combining saliency and distance transform
-    cv::Mat foregroundProb = 1 - (saliencyMap.mul(0.5) + distForeground.mul(0.5)); 
+    cv::Mat foregroundProb = 1 - (saliencyMap.mul(0.5) + distForeground.mul(0.5));
     return foregroundProb;
 }
 
 // returns map of probabilies that each pixel belongs to foreground
-cv::Mat getProbabilityMap(cv::Mat img) {
+cv::Mat getProbabilityMap(cv::Mat img)
+{
     auto map = computeSaliency(img);
     // auto map = saliencyWithRegionGrowing(img);
     // auto map = computeGMMmap(img, 3);
     showProbabilityMap(map);
     return map;
 }
-
 
 weightType getSourceWeightToPixel(int y, int x, cv::Mat probabilityMap)
 {
@@ -178,8 +185,8 @@ cv::Mat getExtractedObject(const std::string &imgPath)
     nodeType n = sink + 1;
 
     cv::Mat probabilityMap = getProbabilityMap(img);
-    //printProbabilityMap(probabilityMap);
-    // adding all weights between pixels in 4-neighbourhood format
+    // printProbabilityMap(probabilityMap);
+    //  adding all weights between pixels in 4-neighbourhood format
     for (int y = 0; y < img.rows; y++)
     {
         for (int x = 0; x < img.cols; x++)
@@ -213,10 +220,10 @@ cv::Mat getExtractedObject(const std::string &imgPath)
     printf("finished making graph\n");
     auto r = imgGraph->createResidualGraph();
     auto nodesToKeep = r->getMinCut(source, sink);
+
     // source, sink nodes don't have corresponding pixels in image
     nodesToKeep.erase(source);
     nodesToKeep.erase(sink);
-
     printNodeSet(nodesToKeep);
 
     cv::Mat mask = createMask(nodesToKeep, img.cols, img.rows);

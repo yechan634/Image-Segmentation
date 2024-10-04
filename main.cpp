@@ -3,8 +3,6 @@
 
 #define DEFAULT_OUTPUT_FILENAME "img.png"
 
-// running this code: g++ your_file.cpp -o output_name `pkg-config --cflags --libs opencv4`
-
 int main(int argc, char *argv[])
 {
     if (argc == 1 || argc > 3)

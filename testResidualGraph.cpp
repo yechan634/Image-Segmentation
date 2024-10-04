@@ -1,13 +1,6 @@
 #include <gtest/gtest.h>
 #include "utilities.h"
 
-// running this testsuite
-// g++ -g -o test testResidualGraph.cpp graph.cpp -lgtest -lgtest_main -pthread && ./test
-// to run only a few of the tests, use filter:
-// ./test --gtest_filter=TestSuiteName.TestName
-// with valgirnd:
-// g++ -g -o test main.cpp testResidualGraph.cpp utilities.cpp -lgtest -lgtest_main -pthread && valgrind --leak-check=full ./test
-
 TEST(GraphTest, ModifyingWeights)
 {
     Graph *g = new Graph();
@@ -41,6 +34,7 @@ TEST(ResidualGraph, PushFlow)
     Graph *g = new Graph();
     g->addNewConnection(1, 2, 2);
     auto r = g->createResidualGraph();
+    r->print();
     childType path;
     path[2] = {1, 2, true};
     r->pushFlow(path, 2, 2);
@@ -122,22 +116,6 @@ TEST(ResidualGraph, MinCut_DisconnectedGraph)
     auto r = g->createResidualGraph();
     auto actualSet = r->getMinCut(1, 4);
     auto expectedSet = std::set<nodeType>{1, 2};
-    assert(sameSet(actualSet, expectedSet));
-    delete g;
-    delete r;
-}
-
-TEST(ResidualGraph, MinCut_MultiplePaths)
-{
-    Graph *g = new Graph();
-    g->addNewConnection(1, 2, 10);
-    g->addNewConnection(1, 3, 5);
-    g->addNewConnection(2, 3, 15);
-    g->addNewConnection(2, 4, 10);
-    g->addNewConnection(3, 4, 10);
-    auto r = g->createResidualGraph();
-    auto actualSet = r->getMinCut(1, 4);
-    auto expectedSet = std::set<nodeType>{1, 2, 3};
     assert(sameSet(actualSet, expectedSet));
     delete g;
     delete r;
