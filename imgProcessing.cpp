@@ -65,7 +65,7 @@ cv::Mat computeSaliency(cv::Mat img)
     }
     saliencyMap.convertTo(saliencyMap, CV_64F, 1.0 / 255.0);
     cv::normalize(saliencyMap, saliencyMap, 0, 1, cv::NORM_MINMAX);
-    return saliencyMap;
+    return (1 - saliencyMap);
 }
 
 
@@ -119,7 +119,7 @@ cv::Mat computeGMMmap(const cv::Mat& image, int numComponents = 5) {
         }
     }
     cv::normalize(probabilityMap, probabilityMap, 0, 1, cv::NORM_MINMAX);
-    return probabilityMap;
+    return (1 - probabilityMap);
 }
 
 
@@ -141,15 +141,15 @@ cv::Mat saliencyWithRegionGrowing(cv::Mat inputImage) {
     cv::normalize(distForeground, distForeground, 0, 1.0, cv::NORM_MINMAX);
 
     // combining saliency and distance transform
-    cv::Mat foregroundProb = saliencyMap.mul(0.5) + distForeground.mul(0.5); 
+    cv::Mat foregroundProb = 1 - (saliencyMap.mul(0.5) + distForeground.mul(0.5)); 
     return foregroundProb;
 }
 
 // returns map of probabilies that each pixel belongs to foreground
 cv::Mat getProbabilityMap(cv::Mat img) {
-    // auto map = computeSaliency(img);
+    auto map = computeSaliency(img);
     // auto map = saliencyWithRegionGrowing(img);
-    auto map = computeGMMmap(img, 3);
+    // auto map = computeGMMmap(img, 3);
     showProbabilityMap(map);
     return map;
 }
