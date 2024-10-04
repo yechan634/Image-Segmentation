@@ -19,12 +19,31 @@ The segmentation problem is treated as a flow network, with the following struct
 
 By applying the Ford-Fulkerson algorithm, the minimum cut is determined. Nodes reachable from the source (S) are classified as foreground, while those connected to the sink (T) are classified as background.
 
+A crucial part of this procedure is estimating the probabilities of the pixels belonging to foreground or background. Many research papers assume some prior information that's used to calculate the probabilites. However, I wanted to calculate them with just the image alone. To do this, there are several approaches that were implemented:
+ - Gaussian Mixture Model
+   - models the colour distribution of pixel values as a mixture of multiple Gaussian distribution
+   - works well for high resolution/complex images
+ - Saliency Map
+   - identifies regions that stand out e.g. edges
+   - provides accurate probabilities for the boundary pixels of objects, but less so for the pixels inside the object 
+ - Saliency Map with Region Growing
+   - same as saliency map but combined with region growing which expands the highlighted regions from the map
+   - in many cases, expands in wrong areas 
+
+After testing each out for sample images, GMMs worked the best. Here are some examples (in order):
+
+<img src="hero.png" width="420" height="420">
+<img src="images/hero_gmm.png" width="420" height="420">
+<img src="images/hero_saliency.png" width="420" height="420">
+<img src="images/hero_salienceyWithRegionGrowing.png" width="420" height="420">
+
 ## How to Run
+### Program
 
 To compile and run the program, follow these steps:
 
 1. Open your terminal and navigate to the project directory.
-2. Compile the program with the following command:
+2. Compile with the following command:
 
    ```bash
    g++ -g -o final main.cpp imgProcessing.cpp utilities.cpp `pkg-config --cflags --libs opencv4`
@@ -50,3 +69,27 @@ There is an existing "cross.png" image in the current directory that can be test
   ```bash
     ./final "cross.png" "output.png"
   ```
+
+### Tests
+
+Similarly to above, open terminal and navigate to the project directory. Then, run the following command:
+
+  ```bash
+   g++ -g -o test testResidualGraph.cpp graph.cpp -lgtest -lgtest_main -pthread
+   ```
+
+Running the created executable on its own will run all the tests.
+To run a single testcase, add the following argument to the executable:
+
+  ```bash
+   ./test --gtest_filter=TestSuiteName.TestCaseName
+   ```
+
+You can also add a check with valgrind simultaneously by adding a second operation when compiling:
+
+  ```bash
+   g++ -g -o test testResidualGraph.cpp graph.cpp -lgtest -lgtest_main -pthread && valgrind --leak-check=full
+   ```
+
+
+
