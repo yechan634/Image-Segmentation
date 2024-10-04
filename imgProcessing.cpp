@@ -13,6 +13,7 @@
 #define SIGMA 5
 #define SOURCE 1
 #define SINK 2
+#define SALIENCY_THRESHOLD 0.6
 
 // assume pixels are valid
 weightType euclidDifference(cv::Vec3b pixel1, cv::Vec3b pixel2)
@@ -52,37 +53,116 @@ cv::Mat createMask(std::set<nodeType> nodesToKeep, int width, int height)
     return mask;
 }
 
-cv::Mat computeSaliency(const cv::Mat &img)
+cv::Mat computeSaliency(cv::Mat img)
 {
-    // Create the saliency algorithm object
     cv::Ptr<cv::saliency::StaticSaliencySpectralResidual> saliencyAlg =
         cv::saliency::StaticSaliencySpectralResidual::create();
-
-    // Compute saliency map
     cv::Mat saliencyMap;
     bool success = saliencyAlg->computeSaliency(img, saliencyMap);
     if (!success)
     {
         throw std::runtime_error("Saliency computation failed.");
     }
-
-    // Convert saliency map to CV_64F and normalize to [0, 1]
     saliencyMap.convertTo(saliencyMap, CV_64F, 1.0 / 255.0);
-
-    // Normalize to the range [0, 1] for better visualization
     cv::normalize(saliencyMap, saliencyMap, 0, 1, cv::NORM_MINMAX);
-
     return saliencyMap;
 }
 
-weightType getSourceWeightToPixel(int y, int x, cv::Mat saliencyMap)
-{
-    return static_cast<weightType>(saliencyMap.at<double>(y, x));
+
+void printProbabilityMap(cv::Mat probabilityMap) {
+    for (int row = 0 ; row < probabilityMap.rows ; ++row) {
+        for (int col = 0 ; col < probabilityMap.cols ; ++col) {
+            printf("%f ", probabilityMap.at<double>(row, col));
+        }
+        printf("\n");
+    }
 }
 
-weightType getSinkWeightToPixel(int y, int x, cv::Mat saliencyMap)
+void showProbabilityMap(cv::Mat probabilityMap) {
+    cv::namedWindow("Grayscale probabilities", cv::WINDOW_NORMAL);
+    cv::resizeWindow("Grayscale probabilities", 800, 800);
+    cv::Mat grayscale;
+    probabilityMap.convertTo(grayscale, CV_8U, 255);
+    cv::imshow("Grayscale probabilities", grayscale);
+    cv::waitKey(0);
+}
+
+
+cv::Mat computeGMMmap(const cv::Mat& image, int numComponents = 5) {
+    // reshaping the image into a 2D matrix with each row as a pixel (in 3D color space)
+    cv::Mat samples = image.reshape(1, image.rows * image.cols);
+    samples.convertTo(samples, CV_64F); // Convert to double type for GMM
+
+    cv::Ptr<cv::ml::EM> gmm = cv::ml::EM::create();
+    gmm->setClustersNumber(numComponents);
+    gmm->setCovarianceMatrixType(cv::ml::EM::COV_MAT_DIAGONAL);
+    gmm->setTermCriteria(cv::TermCriteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 100, 0.1));
+
+    if (gmm->trainEM(samples) < 0) {
+        std::cerr << "GMM training failed." << std::endl;
+        return cv::Mat(); // Return an empty matrix if training fails
+    }
+
+    cv::Mat weights = gmm->getWeights();
+    cv::Mat probabilityMap(image.rows, image.cols, CV_64F, cv::Scalar(0)); // Initialize to zero
+
+    for (int row = 0; row < image.rows; ++row) {
+        for (int col = 0; col < image.cols; ++col) {
+            cv::Vec3d pixel = samples.at<cv::Vec3d>(row * image.cols + col);
+            cv::Mat posterior;
+            gmm->predict2(pixel, posterior);
+            double foregroundProbability = 0.0;
+            for (int i = 0; i < numComponents; ++i) {
+                foregroundProbability += posterior.at<double>(i) * weights.at<double>(i);
+            }
+            probabilityMap.at<double>(row, col) = foregroundProbability;
+        }
+    }
+    cv::normalize(probabilityMap, probabilityMap, 0, 1, cv::NORM_MINMAX);
+    return probabilityMap;
+}
+
+
+cv::Mat saliencyWithRegionGrowing(cv::Mat inputImage) {
+    cv::Ptr<cv::saliency::StaticSaliencyFineGrained> saliencyAlgorithm = cv::saliency::StaticSaliencyFineGrained::create();
+    cv::Mat saliencyMap;
+    saliencyAlgorithm->computeSaliency(inputImage, saliencyMap);
+    
+    cv::normalize(saliencyMap, saliencyMap, 0, 1, cv::NORM_MINMAX);
+    
+    // thresholding saliency map to get foreground estimation
+    cv::Mat initialForeground;
+    cv::threshold(saliencyMap, initialForeground, SALIENCY_THRESHOLD, 1.0, cv::THRESH_BINARY);
+    initialForeground.convertTo(initialForeground, CV_8U, 255);
+
+    // distance transform to propagate probabilities from boundaries
+    cv::Mat distForeground;
+    cv::distanceTransform(initialForeground, distForeground, cv::DIST_L2, 5);
+    cv::normalize(distForeground, distForeground, 0, 1.0, cv::NORM_MINMAX);
+
+    // combining saliency and distance transform
+    cv::Mat foregroundProb = saliencyMap.mul(0.5) + distForeground.mul(0.5); 
+    return foregroundProb;
+}
+
+// returns map of probabilies that each pixel belongs to foreground
+cv::Mat getProbabilityMap(cv::Mat img) {
+    // auto map = computeSaliency(img);
+    // auto map = saliencyWithRegionGrowing(img);
+    auto map = computeGMMmap(img, 3);
+    showProbabilityMap(map);
+    return map;
+}
+
+
+weightType getSourceWeightToPixel(int y, int x, cv::Mat probabilityMap)
 {
-    return (1 - static_cast<weightType>(saliencyMap.at<double>(y, x)));
+    return static_cast<weightType>(probabilityMap.at<double>(y, x));
+}
+
+weightType getSinkWeightToPixel(int y, int x, cv::Mat probabilityMap)
+{
+    return (1 - static_cast<weightType>(probabilityMap.at<double>(y, x)));
 }
 
 cv::Mat getExtractedObject(const std::string &imgPath)
@@ -93,12 +173,12 @@ cv::Mat getExtractedObject(const std::string &imgPath)
         throw std::invalid_argument("Couldn't open or find image\n");
     }
     auto imgGraph = new Graph(img.rows * img.cols);
-    //auto r = imgGraph -> createResidualGraph();
     nodeType source = 1;
     nodeType sink = 2;
     nodeType n = sink + 1;
 
-    cv::Mat saliencyMap = computeSaliency(img);
+    cv::Mat probabilityMap = getProbabilityMap(img);
+    //printProbabilityMap(probabilityMap);
     // adding all weights between pixels in 4-neighbourhood format
     for (int y = 0; y < img.rows; y++)
     {
@@ -109,28 +189,24 @@ cv::Mat getExtractedObject(const std::string &imgPath)
             {
                 auto rightPixel = img.at<cv::Vec3b>(y, x + 1);
                 imgGraph->addNewConnection(n, n + 1, calcWeightBetweenTwoPixels(currentPixel, rightPixel));
-                //r->addNewConnection(n, n + 1, calcWeightBetweenTwoPixels(currentPixel, rightPixel), false);
             }
             if (x > 0)
             {
                 auto leftPixel = img.at<cv::Vec3b>(y, x - 1);
                 imgGraph->addNewConnection(n, n - 1, calcWeightBetweenTwoPixels(currentPixel, leftPixel));
-                //r->addNewConnection(n, n - 1, calcWeightBetweenTwoPixels(currentPixel, leftPixel), false);
             }
             if (y < img.rows - 1)
             {
                 auto belowPixel = img.at<cv::Vec3b>(y + 1, x);
                 imgGraph->addNewConnection(n, n + img.cols, calcWeightBetweenTwoPixels(currentPixel, belowPixel));
-                //r->addNewConnection(n, n + img.cols, calcWeightBetweenTwoPixels(currentPixel, belowPixel), false);
             }
             if (y > 0)
             {
                 auto abovePixel = img.at<cv::Vec3b>(y - 1, x);
                 imgGraph->addNewConnection(n, n - img.cols, calcWeightBetweenTwoPixels(currentPixel, abovePixel));
-                //r->addNewConnection(n, n - img.cols, calcWeightBetweenTwoPixels(currentPixel, abovePixel), false);
             }
-            imgGraph->addNewConnection(source, n, getSourceWeightToPixel(y, x, saliencyMap));
-            imgGraph->addNewConnection(n, sink, getSinkWeightToPixel(y, x, saliencyMap));
+            imgGraph->addNewConnection(source, n, getSourceWeightToPixel(y, x, probabilityMap));
+            imgGraph->addNewConnection(n, sink, getSinkWeightToPixel(y, x, probabilityMap));
             ++n;
         }
     }
