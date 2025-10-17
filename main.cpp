@@ -1,5 +1,5 @@
 #include <opencv2/opencv.hpp>
-#include "imgProcessing.h"
+#include "ImgSegModel.h"
 
 #define DEFAULT_OUTPUT_FILENAME "img.png"
 
@@ -12,8 +12,9 @@ int main(int argc, char *argv[])
     }
     // retrieving input filename
     std::string inputFileName = argv[1];
+    ImgSegModel imgSegModel;
 
-    cv::Mat result = getExtractedObject(inputFileName);
+    cv::Mat result = imgSegModel.getExtractedObject(inputFileName);
 
     // getting output filename
     std::string outputFileName = (argc == 2) ? DEFAULT_OUTPUT_FILENAME : argv[2];

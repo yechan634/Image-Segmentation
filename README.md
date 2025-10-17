@@ -46,7 +46,7 @@ To compile and run the program, follow these steps:
 2. Compile with the following command:
 
    ```bash
-   g++ -g -o final main.cpp imgProcessing.cpp utilities.cpp `pkg-config --cflags --libs opencv4`
+   g++ -g -o final main.cpp ImgSegModel.cpp Graph.cpp `pkg-config --cflags --libs opencv4`
    ```
 
 This command compiles all the source files and generates and executable file called 'final'.
@@ -75,7 +75,7 @@ There is an existing "cross.png" image in the current directory that can be test
 Similarly to above, open terminal and navigate to the project directory. Then, run the following command:
 
   ```bash
-   g++ -g -o test testResidualGraph.cpp graph.cpp -lgtest -lgtest_main -pthread
+   g++ -g -o test TestGraph.cpp Graph.cpp -lgtest -lgtest_main -pthread
    ```
 
 Running the created executable on its own will run all the tests.
@@ -88,7 +88,7 @@ To run a single testcase, add the following argument to the executable:
 You can also add a check with valgrind simultaneously by adding a second operation when compiling:
 
   ```bash
-   g++ -g -o test testResidualGraph.cpp graph.cpp -lgtest -lgtest_main -pthread && valgrind --leak-check=full
+   g++ -g -o test TestGraph.cpp Graph.cpp -lgtest -lgtest_main -pthread && valgrind --leak-check=full
    ```
 
 
